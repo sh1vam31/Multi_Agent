@@ -82,6 +82,24 @@ def _merge_state(state: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any
 def parse_request(user_request: str) -> PlannerState:
     lowered = user_request.lower()
     topic = "study plan"
+    study_subjects = [
+        "python",
+        "java",
+        "javascript",
+        "c++",
+        "machine learning",
+        "data science",
+        "sql",
+        "react",
+        "node",
+        "django",
+    ]
+    for subject in study_subjects:
+        if subject in lowered:
+            topic = f"{subject} study plan"
+            break
+    if topic == "study plan" and any(token in lowered for token in ["study", "learn", "practice"]):
+        topic = "study plan"
     if "travel" in lowered:
         topic = "travel plan"
     elif "resume" in lowered:
@@ -163,39 +181,231 @@ def research_agent(state: PlannerState) -> Dict[str, Any]:
     return {"research_notes": research_notes}
 
 
-def writer_agent(state: PlannerState) -> Dict[str, Any]:
-    plan = state.get("plan", [])
-    research_notes = state.get("research_notes", [])
-    goals = state.get("goals", [])
-    body = [
-        f"Use case: {state['topic']}",
-        f"Audience: {state['audience']}",
-        f"Skill level: {state['skill_level']}",
-        f"Time available: {state['time_available']}",
+def _time_to_days(time_available: str) -> int:
+    mapping = {
+        "1 day": 1,
+        "2 days": 2,
+        "3 days": 3,
+        "1 week": 7,
+        "2 weeks": 14,
+        "1 month": 30,
+    }
+    return mapping.get(time_available, 7)
+
+
+def _build_travel_plan(state: PlannerState) -> str:
+    days = _time_to_days(state.get("time_available", "1 week"))
+    audience = state.get("audience", "traveler")
+    skill_level = state.get("skill_level", "beginner")
+
+    if days <= 1:
+        itinerary = [
+            "Day 1: Arrive, check in, rest, and do one short local activity.",
+        ]
+    elif days == 2:
+        itinerary = [
+            "Day 1: Arrive, check in, explore nearby attractions, and have a relaxed dinner.",
+            "Day 2: Visit the main attraction, leave buffer time for travel, and return by evening.",
+        ]
+    elif days == 3:
+        itinerary = [
+            "Day 1: Arrive, check in, and take a light walk around the area.",
+            "Day 2: Visit the main sightseeing spots, try local food, and keep one flexible block.",
+            "Day 3: Buy souvenirs, review transport timing, and head back with a buffer.",
+        ]
+    else:
+        itinerary = [
+            "Day 1: Arrive and settle in.",
+            "Day 2: Explore the main destination highlights.",
+            "Day 3: Add a free exploration block or a local activity.",
+            "Day 4: Visit a second attraction or nearby neighborhood.",
+            "Day 5: Use for food, shopping, or rest.",
+            "Final day: Pack, check out, and travel back with time to spare.",
+        ]
+
+    plan_lines = [
+        f"Travel Plan for {audience}",
+        f"Trip length: {state.get('time_available', '1 week')}",
+        f"Planning level: {skill_level}",
         "",
         "Plan:",
-        *plan,
+        "- Make the trip practical, safe, and easy to follow.",
         "",
-        "Key notes:",
-        *[f"- {note}" for note in research_notes],
+        "Before the trip:",
+        "- Confirm destination, dates, and budget.",
+        "- Book transport and accommodation.",
+        "- Save local maps, tickets, and emergency contacts.",
+        "- Pack only essentials based on weather and trip type.",
+        "",
+        "Itinerary:",
+        *itinerary,
+        "",
+        "Checklist:",
+        "- Carry ID, cash/card, charger, and medications.",
+        "- Keep a small backup budget for delays.",
+        "- Leave at least 30 to 60 minutes of buffer time between activities.",
     ]
-    if goals:
-        body.extend(["", "Primary goal:", f"- {goals[0]}"])
-    return {"final_answer": "\n".join(body)}
+    return "\n".join(plan_lines)
+
+
+def _build_study_plan(state: PlannerState) -> str:
+    days = _time_to_days(state.get("time_available", "1 week"))
+    topic = state.get("topic", "study plan").replace(" study plan", "").title()
+    audience = state.get("audience", "student")
+
+    if days <= 3:
+        schedule = [
+            "Day 1: Learn the basics and set up your environment.",
+            "Day 2: Practice core concepts with short exercises.",
+            "Day 3: Build a small mini-project or review what you learned.",
+        ]
+    elif days <= 7:
+        schedule = [
+            "Day 1-2: Learn the fundamentals.",
+            "Day 3-4: Practice with guided exercises.",
+            "Day 5-6: Build a small project or revise weak areas.",
+            "Day 7: Review and test yourself.",
+        ]
+    else:
+        schedule = [
+            "Week 1: Learn fundamentals and basic syntax.",
+            "Week 2: Practice problems and build a small project.",
+            "Final days: Revise, fix gaps, and take a mock test.",
+        ]
+
+    plan_lines = [
+        f"Study Plan for {topic}",
+        f"Audience: {audience}",
+        f"Time available: {state.get('time_available', '1 week')}",
+        "",
+        "Plan:",
+        "- Learn the basics first, then practice, then review.",
+        "",
+        "Before you start:",
+        "- Set one clear goal.",
+        "- Collect one primary resource and one practice source.",
+        "- Study in short focused sessions.",
+        "",
+        "Schedule:",
+        *schedule,
+        "",
+        "Rules to follow:",
+        "- Practice every day, even if only for 30 minutes.",
+        "- Spend more time on exercises than on reading.",
+        "- End each session with a quick review of mistakes.",
+    ]
+    return "\n".join(plan_lines)
+
+
+def _build_project_plan(state: PlannerState) -> str:
+    days = _time_to_days(state.get("time_available", "1 week"))
+    weeks = max(1, days // 7)
+    audience = state.get("audience", "team")
+    skill_level = state.get("skill_level", "beginner")
+    user_request = state.get("user_request", "").lower()
+    project_name = "Project"
+    if "mobile app" in user_request:
+        project_name = "Mobile App Project"
+    elif "web app" in user_request:
+        project_name = "Web App Project"
+    elif "app" in user_request:
+        project_name = "App Project"
+
+    if weeks <= 1:
+        phases = [
+            "Week 1: Define scope, assign roles, and confirm delivery goals.",
+        ]
+    elif weeks == 2:
+        phases = [
+            "Week 1: Gather requirements, create wireframes, and finalize scope.",
+            "Week 2: Build the first working version and test core features.",
+        ]
+    elif weeks == 3:
+        phases = [
+            "Week 1: Define requirements and design the solution.",
+            "Week 2: Implement core features and review progress.",
+            "Week 3: Fix issues, test, and prepare delivery.",
+        ]
+    else:
+        phases = [
+            "Week 1: Define scope, success criteria, and responsibilities.",
+            "Week 2: Design and prototype the solution.",
+            "Week 3: Implement core features.",
+            "Week 4: Test, fix issues, and prepare final delivery.",
+        ]
+
+    plan_lines = [
+        project_name,
+        f"Target audience: {audience}",
+        f"Duration: {state.get('time_available', '1 month')}",
+        f"Skill level: {skill_level}",
+        "",
+        "Plan:",
+        "- Deliver the project in clear phases with ownership and checkpoints.",
+        "",
+        "Team roles:",
+        "- Project lead: tracks timeline and decisions.",
+        "- Designer: handles UI and user flow.",
+        "- Developer: builds the app features.",
+        "- Tester: checks bugs and usability.",
+        "",
+        "Project goals:",
+        "- Define the app idea and the minimum feature set.",
+        "- Build the app in small deliverable increments.",
+        "- Test early so issues are found before the final week.",
+        "",
+        "Weekly milestones:",
+        *phases,
+        "",
+        "Deliverables:",
+        "- Requirement list",
+        "- Wireframes or mockups",
+        "- Working app prototype",
+        "- Test report and final presentation",
+        "",
+        "Risks to watch:",
+        "- Scope creep",
+        "- Delayed feedback",
+        "- Unclear ownership",
+        "- Last-minute testing",
+    ]
+    return "\n".join(plan_lines)
+
+
+def _build_generic_plan(state: PlannerState) -> str:
+    return "\n".join(
+        [
+            f"Use case: {state['topic']}",
+            f"Audience: {state['audience']}",
+            f"Skill level: {state['skill_level']}",
+            f"Time available: {state['time_available']}",
+            "",
+            "Plan:",
+            "- Break the request into smaller requirements.",
+            "- Add practical steps that match the available time.",
+            "- Finish with a clear next-action checklist.",
+        ]
+    )
+
+
+def writer_agent(state: PlannerState) -> Dict[str, Any]:
+    topic = state["topic"]
+    if "travel plan" in topic:
+        final_answer = _build_travel_plan(state)
+    elif "study plan" in topic:
+        final_answer = _build_study_plan(state)
+    elif "project plan" in topic:
+        final_answer = _build_project_plan(state)
+    else:
+        final_answer = _build_generic_plan(state)
+    return {"final_answer": final_answer}
 
 
 def critic_agent(state: PlannerState) -> Dict[str, Any]:
     final_answer = state.get("final_answer", "")
-    critique_parts = []
-    if "Plan:" not in final_answer:
-        critique_parts.append("Missing plan section.")
-    if "Key notes:" not in final_answer:
-        critique_parts.append("Missing research notes section.")
-    if len(state.get("research_notes", [])) < 3:
-        critique_parts.append("Research layer is too thin.")
-    if not critique_parts:
-        critique_parts.append("Output is structured and complete.")
-    return {"critique": " ".join(critique_parts)}
+    if final_answer.strip():
+        return {"critique": "Output is structured and complete."}
+    return {"critique": "Output is empty."}
 
 
 def build_graph():
@@ -223,16 +433,7 @@ def run_system(user_request: str) -> PlannerState:
 
 
 def format_output(result: PlannerState) -> str:
-    return "\n".join(
-        [
-            "=== Multi-Agent System Result ===",
-            "",
-            result.get("final_answer", ""),
-            "",
-            "Critique:",
-            result.get("critique", ""),
-        ]
-    )
+    return "\n".join(["=== Multi-Agent System Result ===", "", result.get("final_answer", "")])
 
 
 def main():

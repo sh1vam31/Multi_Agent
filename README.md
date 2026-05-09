@@ -28,7 +28,7 @@ python3 multi_agent_system.py
 Enter a request when prompted, or pass it directly:
 
 ```bash
-python3 multi_agent_system.py --request "help me create a project plan for a team in 2 weeks"
+"help me create a project plan for a team in 2 weeks"
 ```
 
 Print the final state as JSON:
